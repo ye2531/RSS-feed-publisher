@@ -1,1 +1,3 @@
 feedparser==6.0.10
+openai==0.27.8
+newspaper3k==0.2.8
