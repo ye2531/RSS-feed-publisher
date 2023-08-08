@@ -1,3 +1,3 @@
 airflow/logs/
 airflow/dags/__pycache__
-sk.txt
+airflow/dags/settings.py

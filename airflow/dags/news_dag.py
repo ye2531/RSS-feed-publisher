@@ -2,17 +2,12 @@ from airflow import DAG
 from datetime import datetime, timedelta
 from airflow.operators.python import BranchPythonOperator, PythonOperator
 from airflow.operators.dummy import DummyOperator
-from dotenv import load_dotenv
+from settings import RSS_FEED_URL, NAMED_ENTITY
 import newspaper
 import feedparser
 import logging
-import openai
 import re
-import os
 
-load_dotenv()
-
-openai.my_api_key = os.environ.get("OPENAI_SECRET_KEY")
 
 def parse_entry_url(url):
     return re.search(r"url=([^&]+)", url).group(1)
@@ -24,44 +19,38 @@ def _check_feed_updates(**context):
 
     logger.info(f"Fetching updates for {start_time}")
     feed = feedparser.parse(RSS_FEED_URL)
-    logger.info(f"Fetched {len(feed)} entries from the feed")
+    logger.info(f"Fetched {len(feed.entries)} entries from the feed")
 
-    ts_time = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S%z").replace(tzinfo=None)
-    previous_run_time = ts_time - timedelta(minutes=2)
-    logger.info(f"Looking for updates between {str(previous_run_time)} and {start_time}")
-    
-    new_entries = []
-    for i, entry in enumerate(feed.entries):
-        published_time = datetime.strptime(entry.published, "%Y-%m-%dT%H:%M:%SZ")
-        logger.info(f"{i}th entry was pulished at {published_time}")
-        if (published_time <= ts_time) and (published_time > previous_run_time):
-            new_entries.append({"id": entry.id,
-                    "title": entry.title,
-                    "link": parse_entry_url(entry.link),
-                    "published": entry.published,
-                    "summary": ""})
+    update_time = datetime.strptime(feed.feed.updated, "%Y-%m-%dT%H:%M:%SZ")
 
+    with open("dags/temp/update_time.txt", "r+") as file:
+        last_update_time = datetime.strptime(file.read(), "%Y-%m-%dT%H:%M:%SZ")
 
-    # new_entries = [{"id": entry.id,
-    #                 "title": entry.title,
-    #                 "link": entry.link,
-    #                 "published": entry.published,
-    #                 "summary": entry.summary} for entry in feed.entries if (
-    #     (published_time := datetime.strptime(entry.published, "%Y-%m-%dT%H:%M:%SZ")) <= ts_time and
-    #     published_time > previous_run_time)]
+        if update_time > last_update_time:
+            file.seek(0)
+            file.write(feed.feed.updated)
+            file.truncate()
 
-    if not new_entries:
-        logger.info(f"There were no updates between {str(previous_run_time)} and {start_time}. Stopping execution...")
-        return "stop_dag_no_updates"
-    else:
-        context["ti"].xcom_push(key="new_entries", value=new_entries)
-        return "process_updates"
+            new_entries = [{"id": entry.id,
+                            "title": entry.title,
+                            "link": parse_entry_url(entry.link),
+                            "published": entry.published,
+                            "summary": entry.summary} for entry in feed.entries \
+                                if datetime.strptime(entry.published, "%Y-%m-%dT%H:%M:%SZ") > last_update_time]
+            
+            context["ti"].xcom_push(key="new_entries", value=new_entries)
+            return "process_updates"  
+          
+        else:
+            logger.info(f"There were no updates. Stopping execution...")
+            return "stop_dag_no_updates"
 
 def _extract_article_text(url):
     article = newspaper.Article(url)
     try:
         article.download()
         article.parse()
+
         return article.text
     
     except Exception as e:
@@ -70,20 +59,20 @@ def _extract_article_text(url):
         return None
 
 def _process_updates(**context):
-    entries = context["ti"].xcom_pull(task_id="check_feed_updates", key="new_entries")
-    entries_with_summary = []
+
+    entries = context["ti"].xcom_pull(task_ids="check_feed_updates", key="new_entries")
+
+    entries_clean = []
+
     for entry in entries:
         entry_text = _extract_article_text(entry["link"])
         if entry_text and NAMED_ENTITY in entry_text:
-            message = {"role": "system", "content": OPENAI_PROMPT + entry_text}
-            chat = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[message])
-            reply = chat.choices[0].message.content
-            entry["summary"] = reply
-            entries_with_summary.append(entry)
-    if not entries_with_summary:
+            entries_clean.append(entry)
+
+    if not entries_clean:
         return "stop_dag_no_articles"
     else:
-        context["ti"].xcom_push(key="entries_with_summary", value=entries_with_summary)
+        context["ti"].xcom_push(key="entries_with_summary", value=entries_clean)
         return "save_and_publish"
 
 def _save_new_entries():
