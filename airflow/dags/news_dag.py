@@ -19,17 +19,17 @@ def _generate_sql_statements(**context):
 
     entries = context["ti"].xcom_pull(task_ids="process_updates", key="new_entries_clean")
 
+    sql_statements = ""
+
+    for entry in entries:
+         sql_statements += "INSERT INTO articles(published, title, link, article_text, dag_run_time) VALUES (" \
+                          f"\'{entry['published']}\', \'{replace_apostrophes(entry['title'])}\', \'{entry['link']}\',\'{replace_apostrophes(entry['text'])}\', \'{context['ts']}\'" \
+                           ");\n"
+         
     sql_file_path = os.path.join(get_dags_folder_path(), "sql/postgres_query.sql")
 
     with open(sql_file_path, "w") as f:
-
-        for entry in entries:
-        
-            f.write(
-                    "INSERT INTO articles(published, title, link, article_text, dag_run_time) VALUES ("
-                        f"\'{entry['published']}\', \'{replace_apostrophes(entry['title'])}\', \'{entry['link']}\',\'{replace_apostrophes(entry['text'])}\', \'{context['ts']}\'"
-                        ");\n"
-                    )
+            f.write(sql_statements)
 
 def _generate_telegram_message(**context):
 
