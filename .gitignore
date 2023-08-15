@@ -1,5 +1,7 @@
 airflow/logs/
 airflow/dags/__pycache__
-airflow/dags/settings.py
+airflow/dags/modules/settings.py
+airflow/dags/modules/__pycache__
+airflow/dags/utils/__pycache__
 airflow/dags/sql/postgres_query.sql
 airflow/dags/temp/
