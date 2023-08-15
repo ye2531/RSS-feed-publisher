@@ -35,14 +35,13 @@ def _generate_telegram_message(**context):
 
     entries = context["ti"].xcom_pull(task_ids="process_updates", key="new_entries_clean")
 
-    if len(entries) > 1:
-        message = f"{NAMED_ENTITY} was mentioned in the following articles:\n\n"
-        for entry in entries:
+    article_plural = "articles" if len(entries) > 1 else "article"
+    message = f"{NAMED_ENTITY} was mentioned in the following {article_plural}:\n\n"
+
+    for entry in entries:
             message += f"[{entry['title']}]({entry['link']})\n\n"
-        context["ti"].xcom_push(key="telegram_message", value=message)
-    else: 
-        message = f"{NAMED_ENTITY} was mentioned in the following article:\n\n*{entries[0]['title']}*\n\n{entries[0]['link']}"
-        context["ti"].xcom_push(key="telegram_message", value=message)
+
+    context["ti"].xcom_push(key="telegram_message", value=message)
 
 with DAG(
     dag_id="news_dag",
