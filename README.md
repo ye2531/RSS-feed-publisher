@@ -39,6 +39,13 @@ Before running the project, you need to set up the following configurations:
 2. **Telegram Token:**
    - Set up an Apache Airflow Variable named `TELEGRAM_BOT_TOKEN` with your Telegram bot token value.
 
+3. **Environment variables:**
+   
+   Inside of `settings.py` file set
+   - `RSS_FEED_URL` to the URL of the RSS feed you want to fetch and process
+   - `NAMED_ENTITY` to the named entity for which updates are to be tracked. This could be a person, organization, product, etc.
+   - `CHAT_ID` to the unique identifier of the Telegram channel where you want to send notifications.
+
 ## Execution
 
 1. Navigate to the project directory: `cd your_project`
