@@ -48,6 +48,10 @@ def fetch_feed_updates(**context):
     feed = feedparser.parse(RSS_FEED_URL)
     logger.info(f"Fetched {len(feed.entries)} entries from the feed")
 
+    if len(feed.entries) == 0:
+        logger.info(f"There were no updates. Stopping execution...")
+        return "stop_dag_no_updates"
+
     update_time = string_to_date(feed.feed.updated)
 
     update_time_file_path = os.path.join(get_dags_folder_path(), "temp/update_time.txt")
