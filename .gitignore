@@ -1,6 +1,4 @@
-logs/
 dags/__pycache__
-dags/modules/settings.py
 dags/modules/__pycache__
 dags/utils/__pycache__
 dags/sql/postgres_query.sql
